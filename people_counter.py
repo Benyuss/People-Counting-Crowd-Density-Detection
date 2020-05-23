@@ -56,8 +56,8 @@ time.sleep(2.0)
 
 # initialize the frame dimensions (we'll set them as soon as we read
 # the first frame from the video)
-frameWidth = None
-frameHeight = None
+W = None
+H = None
 
 # instantiate our centroid tracker, then initialize a list to store
 # each of our dlib correlation trackers, followed by a dictionary to
@@ -85,10 +85,10 @@ def onFrameReceived():
 	frame = imutils.resize(frame, width=500)
 	rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 	
-	global frameWidth, frameHeight, totalFrames, totalUp, totalDown, trackers, ct, trackableObjects
+	global W, H, totalFrames, totalUp, totalDown, trackers, ct, trackableObjects
 	# if the frame dimensions are empty, set them
-	if frameWidth is None or frameHeight is None:
-		(frameHeight, frameWidth) = frame.shape[:2]
+	if W is None or H is None:
+		(H, W) = frame.shape[:2]
 
 	# initialize the current status along with our list of bounding
 	# box rectangles returned by either (1) our object detector or
@@ -105,7 +105,7 @@ def onFrameReceived():
 
 		# convert the frame to a blob and pass the blob through the
 		# network and obtain the detections
-		blob = cv2.dnn.blobFromImage(frame, 0.007843, (frameWidth, frameHeight), 127.5)
+		blob = cv2.dnn.blobFromImage(frame, 0.007843, (W, H), 127.5)
 		net.setInput(blob)
 		detections = net.forward()
 
@@ -128,7 +128,7 @@ def onFrameReceived():
 
 				# compute the (x, y)-coordinates of the bounding box
 				# for the object
-				box = detections[0, 0, i, 3:7] * np.array([frameWidth, frameHeight, frameWidth, frameHeight])
+				box = detections[0, 0, i, 3:7] * np.array([W, H, W, H])
 				(startX, startY, endX, endY) = box.astype("int")
 
 				# construct a dlib rectangle object from the bounding
@@ -167,7 +167,7 @@ def onFrameReceived():
 	# draw a horizontal line in the center of the frame -- once an
 	# object crosses this line we will determine whether they were
 	# moving 'up' or 'down'
-	cv2.line(frame, (0, frameHeight // 2), (frameWidth, frameHeight // 2), (0, 255, 255), 2)
+	cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
 
 	# use the centroid tracker to associate the (1) old object
 	# centroids with (2) the newly computed object centroids
@@ -232,7 +232,7 @@ def onFrameReceived():
 	# loop over the info tuples and draw them on our frame
 	for (i, (k, v)) in enumerate(info):
 		text = "{}: {}".format(k, v)
-		cv2.putText(frame, text, (10, frameHeight - ((i * 20) + 20)),
+		cv2.putText(frame, text, (10, H - ((i * 20) + 20)),
 			cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
 	# show the output frame
