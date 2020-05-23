@@ -10,6 +10,7 @@
 #	--output output/webcam_output.avi
 
 # import the necessary packages
+from concurrent.futures import ThreadPoolExecutor
 from pyimagesearch.centroidtracker import CentroidTracker
 from pyimagesearch.trackableobject import TrackableObject
 from imutils.video import FileVideoStream
@@ -20,6 +21,7 @@ import imutils
 import time
 import dlib
 import cv2
+import threading
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -54,8 +56,8 @@ time.sleep(2.0)
 
 # initialize the frame dimensions (we'll set them as soon as we read
 # the first frame from the video)
-W = None
-H = None
+frameWidth = None
+frameHeight = None
 
 # instantiate our centroid tracker, then initialize a list to store
 # each of our dlib correlation trackers, followed by a dictionary to
@@ -73,10 +75,8 @@ totalUp = 0
 # start the frames per second throughput estimator
 fps = FPS().start()
 
-# loop over frames from the video stream
-while True:
-	# grab the next frame and handle if we are reading from either
-	# VideoCapture or VideoStream
+# on frame onFrameReceived
+def onFrameReceived():
 	frame = vs.read()
 
 	# resize the frame to have a maximum width of 500 pixels (the
@@ -84,17 +84,18 @@ while True:
 	# the frame from BGR to RGB for dlib
 	frame = imutils.resize(frame, width=500)
 	rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
+	
+	global frameWidth, frameHeight, totalFrames, totalUp, totalDown, trackers, ct, trackableObjects
 	# if the frame dimensions are empty, set them
-	if W is None or H is None:
-		(H, W) = frame.shape[:2]
+	if frameWidth is None or frameHeight is None:
+		(frameHeight, frameWidth) = frame.shape[:2]
 
 	# initialize the current status along with our list of bounding
 	# box rectangles returned by either (1) our object detector or
 	# (2) the correlation trackers
 	status = "Waiting"
 	rects = []
-
+	
 	# check to see if we should run a more computationally expensive
 	# object detection method to aid our tracker
 	if totalFrames % args["skip_frames"] == 0:
@@ -104,7 +105,7 @@ while True:
 
 		# convert the frame to a blob and pass the blob through the
 		# network and obtain the detections
-		blob = cv2.dnn.blobFromImage(frame, 0.007843, (W, H), 127.5)
+		blob = cv2.dnn.blobFromImage(frame, 0.007843, (frameWidth, frameHeight), 127.5)
 		net.setInput(blob)
 		detections = net.forward()
 
@@ -127,7 +128,7 @@ while True:
 
 				# compute the (x, y)-coordinates of the bounding box
 				# for the object
-				box = detections[0, 0, i, 3:7] * np.array([W, H, W, H])
+				box = detections[0, 0, i, 3:7] * np.array([frameWidth, frameHeight, frameWidth, frameHeight])
 				(startX, startY, endX, endY) = box.astype("int")
 
 				# construct a dlib rectangle object from the bounding
@@ -166,7 +167,7 @@ while True:
 	# draw a horizontal line in the center of the frame -- once an
 	# object crosses this line we will determine whether they were
 	# moving 'up' or 'down'
-	cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
+	cv2.line(frame, (0, frameHeight // 2), (frameWidth, frameHeight // 2), (0, 255, 255), 2)
 
 	# use the centroid tracker to associate the (1) old object
 	# centroids with (2) the newly computed object centroids
@@ -221,6 +222,7 @@ while True:
 
 	# construct a tuple of information we will be displaying on the
 	# frame
+	
 	info = [
 		("Up", totalUp),
 		("Down", totalDown),
@@ -230,21 +232,30 @@ while True:
 	# loop over the info tuples and draw them on our frame
 	for (i, (k, v)) in enumerate(info):
 		text = "{}: {}".format(k, v)
-		cv2.putText(frame, text, (10, H - ((i * 20) + 20)),
+		cv2.putText(frame, text, (10, frameHeight - ((i * 20) + 20)),
 			cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
 	# show the output frame
 	cv2.imshow("Frame", frame)
-	key = cv2.waitKey(1) & 0xFF
-
-	# if the `q` key was pressed, break from the loop
-	if key == ord("q"):
-		break
 
 	# increment the total number of frames processed thus far and
 	# then update the FPS counter
 	totalFrames += 1
+
 	fps.update()
+
+executor = ThreadPoolExecutor(max_workers=5)
+# loop over frames from the video stream
+while True:
+	# grab the next frame and handle if we are reading from either
+	# VideoCapture or VideoStream
+	executor.submit(onFrameReceived())
+	
+	key = cv2.waitKey(1) & 0xFF
+	
+	# if the `q` key was pressed, break from the loop
+	if key == ord("q"):
+		break
 
 # stop the timer and display FPS information
 fps.stop()
