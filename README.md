@@ -1,3 +1,6 @@
+python3 people_counter.pyc -m ./mobilenet_ssd/MobileNetSSD_deploy.caffemodel -p ./mobilenet_ssd/MobileNetSSD_deploy.prototxt -i rtsp://192.168.0.213:8080/h264_pcm.sdp -s 60
+
+
 # The Crowd Density Project 
 
 This is a project at #sg_wonder_vision study group of the Facebook Secure and Private AI Scholarship Challenge 2019
